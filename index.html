@@ -195,6 +195,13 @@
         let raycaster = new THREE.Raycaster(), mouse = new THREE.Vector2();
         let isDragging = false, hasMoved = false, prevMouse = {x:0, y:0}, origTransforms = new Map();
         
+        // Track textures explicitly so we can live-update them when background loads finish
+        let capMat, leftGateLogoTex, rightGateLogoTex, card1FrontTex, card2FrontTex, cardBackTex;
+        const socialTextures = {};
+        
+        const txt1 = "بكل المحبة والتقدير، نتشرف بدعوتكم لحضور حفل التكريم، ~ آملين أن يكتمل جمال المناسبة بحضوركم الكريم ~ تتشرف د/ داليا بدعوتكم لحضور حفل التكريم لسيادة النائب / احمد خشانه";
+        const txt2 = "حضوركم شرف لنا، ~ ووجودكم يضيف على المناسبة بهجةً وتميزًا ~ يوم الجمعة 10/7/2026 ~ الاستقبال من 6:00 PM إلى 11:00 PM ~ السويس، الكورنيش القديم - داخل منتجع WATER WAY SUEZ ~ يشرفنا حضوركم الكريم";
+
         const loadedAssets = {}, socialMeshes = [];
         let finalCamZ = 40; 
         let focusDist = 14; 
@@ -247,7 +254,10 @@
             
             const singlePad = isMobile ? 1.0 : 4.0;
             const fDistW = ((cardW + singlePad) / 2) / (Math.tan(fovRad / 2) * aspect);
-            const fDistH = ((cardH + singlePad) / 2) / Math.tan(fovRad / 2);
+            
+            // vertical padding offset to ensure graduation cap & pedestal are fully visible
+            const fDistH = ((cardH + singlePad + 7.5) / 2) / Math.tan(fovRad / 2);
+            
             focusDist = Math.max(fDistW, fDistH);
             if(focusDist < 10.0) focusDist = 10.0; 
 
@@ -283,13 +293,15 @@
         function setAppReady() {
             if(isReady) return;
             isReady = true;
-            init3D();
+            init3D(); // Will init with available (or dummy fallback) assets
             
             document.fonts.ready.then(() => {
                 const track = document.getElementById('loading-track');
                 if(track) track.style.display = 'none';
                 const status = document.getElementById('loader-status');
-                if(status) status.innerHTML = "<div class='loader-tap-hint'>انقر هنا لبدء العرض</div>";
+                
+                // Display "Click to Start" button and DO NOT auto-hide the #loader
+                if(status) status.innerHTML = "<div class='loader-tap-hint' style='font-size: 16px; font-weight: bold;'>اضغط للبدء</div>";
             });
         }
 
@@ -300,6 +312,52 @@
             if(fill) fill.style.width = `${(assetsLoaded/totalImageAssets)*100}%`;
             if (assetsLoaded >= totalImageAssets) {
                 setAppReady();
+            }
+        }
+
+        // Live updating pipeline: Updates 3D assets progressively as they load
+        function notifyAssetLoaded(id) {
+            if (!isReady || !scene) return;
+
+            if (id === 'bgBase' && backdropBase) {
+                backdropBase.material.map.image = imgToCanvas(loadedAssets.bgBase);
+                backdropBase.material.map.needsUpdate = true;
+                calcSweetSpot();
+            }
+            else if (id === 'bgComp' && backdropComp) {
+                backdropComp.material.map.image = imgToCanvas(loadedAssets.bgComp);
+                backdropComp.material.map.needsUpdate = true;
+                calcSweetSpot();
+            }
+            else if (id === 'cap' && capMat) {
+                capMat.map.image = imgToCanvas(loadedAssets.cap);
+                capMat.map.needsUpdate = true;
+            }
+            else if (id === 'logo') {
+                if (leftGateLogoTex) {
+                    leftGateLogoTex.image = loadedAssets.logo || imgToCanvas(null);
+                    leftGateLogoTex.needsUpdate = true;
+                }
+                if (rightGateLogoTex) {
+                    rightGateLogoTex.image = loadedAssets.logo || imgToCanvas(null);
+                    rightGateLogoTex.needsUpdate = true;
+                }
+                if (card1FrontTex) {
+                    card1FrontTex.image = createCardCanvas(true, txt1);
+                    card1FrontTex.needsUpdate = true;
+                }
+                if (card2FrontTex) {
+                    card2FrontTex.image = createCardCanvas(true, txt2);
+                    card2FrontTex.needsUpdate = true;
+                }
+                if (cardBackTex) {
+                    cardBackTex.image = createCardCanvas(false, null);
+                    cardBackTex.needsUpdate = true;
+                }
+            }
+            else if (['fb', 'tiktok', 'ig'].includes(id) && socialTextures[id]) {
+                socialTextures[id].image = imgToCanvas(loadedAssets[id]);
+                socialTextures[id].needsUpdate = true;
             }
         }
 
@@ -316,6 +374,7 @@
                 img.onload = () => { 
                     loadedAssets[id] = img; 
                     updateProg(); 
+                    notifyAssetLoaded(id); // Progressive background rendering update
                 }; 
                 
                 img.onerror = () => { 
@@ -323,12 +382,14 @@
                     if (currentExtIndex < extensions.length) {
                         attemptLoad(); 
                     } else {
+                        // Create a dummy canvas to gracefully skip failed assets without breaking
                         const dummy = document.createElement('canvas');
                         dummy.width = 512; dummy.height = 512;
                         const dctx = dummy.getContext('2d');
                         dctx.fillStyle = '#ffffff'; dctx.fillRect(0,0,512,512);
                         loadedAssets[id] = dummy; 
                         updateProg(); 
+                        notifyAssetLoaded(id); // Inject dummy fallback to keep pipeline moving
                     }
                 }; 
                 
@@ -362,29 +423,13 @@
                 loadImgWithFallback(key, assetsToLoad[key]);
             }
             
-            // STRICT 5-SECOND HARD TIMEOUT REQUIREMENT
+            // STRICT 3-SECOND HARD TIMEOUT REQUIREMENT
+            // Acts as an absolute fail-safe to unblock the UI if network is lagging
             setTimeout(() => {
-                const loader = document.getElementById('loader');
-                if (loader && loader.style.display !== 'none') {
-                    // MUST execute this line precisely to guarantee removal
-                    loader.style.display = 'none';
-                    
-                    if (!isReady) setAppReady();
-                    
-                    if (!interactionTriggered) {
-                        interactionTriggered = true;
-                        
-                        const v = document.getElementById('bird-video');
-                        if (v) {
-                            v.muted = true;
-                            const playPromise = v.play();
-                            if (playPromise !== undefined) playPromise.catch(e => console.log(e));
-                        }
-                        
-                        startCinematic();
-                    }
+                if (!isReady) {
+                    setAppReady();
                 }
-            }, 5000); 
+            }, 3000); 
         };
         
         window.addEventListener('pointerdown', triggerStart);
@@ -437,7 +482,7 @@
             });
         }
 
-        // STRICT 2048px CANVAS RESOLUTION REQUIREMENT
+        // Returns raw HTMLCanvasElement now, letting texture mapping happen independently
         function createCardCanvas(isFront, txtData) {
             const cw = 2048, ch = 3072; // Adjusted proportionally for exact 2048 width limit
             const c = document.createElement('canvas'); c.width = cw; c.height = ch; const ctx = c.getContext('2d');
@@ -500,7 +545,12 @@
                 ctx.fillStyle='#999'; ctx.font='bold 127px Amiri'; ctx.fillText('Connect With Us', cw/2, 1687); 
             }
 
-            const tex = new THREE.CanvasTexture(c); 
+            return c;
+        }
+
+        // Texture initializer helper to clean up material application
+        function buildTextureFromCanvas(canvas) {
+            const tex = new THREE.CanvasTexture(canvas); 
             tex.encoding = THREE.sRGBEncoding; 
             if(renderer) { tex.anisotropy = renderer.capabilities.getMaxAnisotropy(); }
             tex.minFilter = THREE.LinearFilter;
@@ -649,21 +699,21 @@
             const logoSize = 38;
             const halfSize = logoSize / 2;
             
-            const texL = new THREE.Texture(loadedAssets.logo || imgToCanvas(null)); texL.needsUpdate = true;
-            texL.repeat.set(0.5, 1); texL.offset.set(0, 0); texL.encoding = THREE.sRGBEncoding;
-            texL.minFilter = THREE.LinearFilter; texL.magFilter = THREE.LinearFilter;
+            leftGateLogoTex = new THREE.Texture(loadedAssets.logo || imgToCanvas(null)); leftGateLogoTex.needsUpdate = true;
+            leftGateLogoTex.repeat.set(0.5, 1); leftGateLogoTex.offset.set(0, 0); leftGateLogoTex.encoding = THREE.sRGBEncoding;
+            leftGateLogoTex.minFilter = THREE.LinearFilter; leftGateLogoTex.magFilter = THREE.LinearFilter;
             
-            const texR = new THREE.Texture(loadedAssets.logo || imgToCanvas(null)); texR.needsUpdate = true;
-            texR.repeat.set(0.5, 1); texR.offset.set(0.5, 0); texR.encoding = THREE.sRGBEncoding;
-            texR.minFilter = THREE.LinearFilter; texR.magFilter = THREE.LinearFilter;
+            rightGateLogoTex = new THREE.Texture(loadedAssets.logo || imgToCanvas(null)); rightGateLogoTex.needsUpdate = true;
+            rightGateLogoTex.repeat.set(0.5, 1); rightGateLogoTex.offset.set(0.5, 0); rightGateLogoTex.encoding = THREE.sRGBEncoding;
+            rightGateLogoTex.minFilter = THREE.LinearFilter; rightGateLogoTex.magFilter = THREE.LinearFilter;
 
-            const logoMatL = new THREE.MeshBasicMaterial({map: texL, transparent: true, opacity: 1, alphaTest: 0.5, depthWrite: true, side: THREE.FrontSide});
+            const logoMatL = new THREE.MeshBasicMaterial({map: leftGateLogoTex, transparent: true, opacity: 1, alphaTest: 0.5, depthWrite: true, side: THREE.FrontSide});
             const logoPlaneL = new THREE.Mesh(new THREE.PlaneGeometry(halfSize, logoSize), logoMatL);
             // DOOR LOGO CONSTRAINT: Exactly 0.05 units forward Z-index offset
             logoPlaneL.position.set(gateW - halfSize/2, 0, gateD/2 + 0.05); 
             leftGate.add(logoPlaneL);
 
-            const logoMatR = new THREE.MeshBasicMaterial({map: texR, transparent: true, opacity: 1, alphaTest: 0.5, depthWrite: true, side: THREE.FrontSide});
+            const logoMatR = new THREE.MeshBasicMaterial({map: rightGateLogoTex, transparent: true, opacity: 1, alphaTest: 0.5, depthWrite: true, side: THREE.FrontSide});
             const logoPlaneR = new THREE.Mesh(new THREE.PlaneGeometry(halfSize, logoSize), logoMatR);
             // DOOR LOGO CONSTRAINT: Exactly 0.05 units forward Z-index offset
             logoPlaneR.position.set(-gateW + halfSize/2, 0, gateD/2 + 0.05); 
@@ -686,17 +736,17 @@
         function buildCards() {
             const g = new THREE.BoxGeometry(cardW, cardH, cardD);
             const edgeMat = new THREE.MeshStandardMaterial({color:0xffd700, metalness:0.95, roughness:0.1});
-            const backMat = new THREE.MeshStandardMaterial({map:createCardCanvas(false, null), roughness:0.15});
+            
+            cardBackTex = buildTextureFromCanvas(createCardCanvas(false, null));
+            const backMat = new THREE.MeshStandardMaterial({map:cardBackTex, roughness:0.15});
 
-            const txt1 = "بكل المحبة والتقدير، نتشرف بدعوتكم لحضور حفل التكريم، ~ آملين أن يكتمل جمال المناسبة بحضوركم الكريم ~ تتشرف د/ داليا بدعوتكم لحضور حفل التكريم لسيادة النائب / احمد خشانه";
-            const t1 = createCardCanvas(true, txt1);
-            c1 = new THREE.Mesh(g, [edgeMat, edgeMat, edgeMat, edgeMat, new THREE.MeshStandardMaterial({map:t1, roughness:0.15}), backMat]);
+            card1FrontTex = buildTextureFromCanvas(createCardCanvas(true, txt1));
+            c1 = new THREE.Mesh(g, [edgeMat, edgeMat, edgeMat, edgeMat, new THREE.MeshStandardMaterial({map:card1FrontTex, roughness:0.15}), backMat]);
             c1.position.set(cardSeparation, 0, 0); 
             c1.rotation.y = 0; 
 
-            const txt2 = "حضوركم شرف لنا، ~ ووجودكم يضيف على المناسبة بهجةً وتميزًا ~ يوم الجمعة 10/7/2026 ~ الاستقبال من 6:00 PM إلى 11:00 PM ~ السويس، الكورنيش القديم - داخل منتجع WATER WAY SUEZ ~ يشرفنا حضوركم الكريم";
-            const t2 = createCardCanvas(true, txt2);
-            c2 = new THREE.Mesh(g, [edgeMat, edgeMat, edgeMat, edgeMat, new THREE.MeshStandardMaterial({map:t2, roughness:0.15}), backMat]);
+            card2FrontTex = buildTextureFromCanvas(createCardCanvas(true, txt2));
+            c2 = new THREE.Mesh(g, [edgeMat, edgeMat, edgeMat, edgeMat, new THREE.MeshStandardMaterial({map:card2FrontTex, roughness:0.15}), backMat]);
             c2.position.set(-cardSeparation, 0, 0); 
             c2.rotation.y = 0;
 
@@ -704,7 +754,7 @@
 
             const capTex = new THREE.CanvasTexture(imgToCanvas(loadedAssets.cap));
             capTex.encoding = THREE.sRGBEncoding; capTex.minFilter = THREE.LinearFilter; capTex.magFilter = THREE.LinearFilter;
-            const capMat = new THREE.MeshBasicMaterial({
+            capMat = new THREE.MeshBasicMaterial({
                 map: capTex, transparent: true, alphaTest: 0.1, side: THREE.DoubleSide
             });
             const capGeometry = new THREE.PlaneGeometry(8, 8);
@@ -728,11 +778,11 @@
 
                 const socSize = 3;
                 ['ig','tiktok','fb'].forEach((k, i) => {
-                    const st = new THREE.CanvasTexture(imgToCanvas(loadedAssets[k]));
-                    st.minFilter = THREE.LinearFilter; st.magFilter = THREE.LinearFilter;
+                    socialTextures[k] = new THREE.CanvasTexture(imgToCanvas(loadedAssets[k]));
+                    socialTextures[k].minFilter = THREE.LinearFilter; socialTextures[k].magFilter = THREE.LinearFilter;
                     const ic = new THREE.Mesh(
                         new THREE.PlaneGeometry(socSize, socSize), 
-                        new THREE.MeshBasicMaterial({map:st, transparent:true})
+                        new THREE.MeshBasicMaterial({map:socialTextures[k], transparent:true})
                     );
                     ic.position.set((i-1)*(socSize*1.4), -cardH/4 - 1.5, -0.21); 
                     ic.rotation.y = Math.PI; 
@@ -801,4 +851,4 @@
         };
     </script>
 </body>
-</html> 
+</html>
