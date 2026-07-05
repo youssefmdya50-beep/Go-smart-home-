@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Go Smart Home - Premium Invitation</title>
+    <link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { 
+            overflow: hidden; 
+            background-color: #ffffff; 
+            font-family: 'Cairo', sans-serif; 
+            touch-action: none; 
+            user-select: none; 
+            -webkit-user-select: none; 
+        }
+        canvas { 
+            display: block; 
+            width: 100vw !important; 
+            height: 100vh !important; 
+            position: absolute; 
+            top: 0; 
+            left: 0; 
+            z-index: 1; 
+        }
+
+        /* Preloader Styles */
+        #loader { 
+            position: fixed; 
+            inset: 0; 
+            background: #ffffff; 
+            z-index: 9999; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center; 
+            transition: opacity 0.4s ease; 
+        }
+        .loader-title { 
+            color: #d4af37; 
+            font-family: 'Amiri', serif; 
+            font-size: 1.8rem; 
+            font-weight: bold; 
+            margin-bottom: 20px; 
+            letter-spacing: 1.5px; 
+            text-shadow: 0 2px 10px rgba(212, 175, 55, 0.2); 
+            text-align: center; 
+            line-height: 1.4;
+        }
+        .loader-logo-container { 
+            width: 110px; 
+            height: 110px; 
+            border-radius: 50%; 
+            border: 2px solid #d4af37; 
+            overflow: hidden; 
+            margin-bottom: 20px; 
+            box-shadow: 0 10px 30px rgba(212, 175, 55, 0.15); 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            background: #fff; 
+            padding: 5px; 
+        }
+        .loader-logo-container img { 
+            width: 100%; 
+            height: 100%; 
+            object-fit: contain; 
+            border-radius: 50%; 
+        }
+        .loading-bar-track { 
+            width: 180px; 
+            height: 2px; 
+            background: #f0f0f0; 
+            border-radius: 2px; 
+            overflow: hidden; 
+            margin-bottom: 15px; 
+            transition: opacity 0.3s; 
+        }
+        #loading-bar-fill { 
+            height: 100%; 
+            width: 0%; 
+            background: linear-gradient(90deg, #aa8a2e, #ffe58f, #d4af37); 
+            transition: width 0.2s ease; 
+        }
+        .loader-text { 
+            color: #d4af37; 
+            font-size: 13px; 
+            font-weight: 600; 
+            letter-spacing: 0.5px; 
+            text-align: center; 
+            font-family: 'Cairo', sans-serif; 
+            transition: all 0.3s ease; 
+        }
+        .loader-tap-hint {
+            font-size: 13px;
+            opacity: 0;
+            animation: pulseHint 1.5s infinite;
+            margin-top: 10px;
+            color: #aa8a2e;
+            cursor: pointer;
+            padding: 8px 20px;
+            border: 1px solid rgba(212, 175, 55, 0.4);
+            border-radius: 20px;
+            background: rgba(212, 175, 55, 0.05);
+            box-shadow: 0 4px 15px rgba(212, 175, 55, 0.1);
+        }
+
+        @keyframes pulseHint {
+            0%, 100% { opacity: 0.8; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.05); }
+        }
+
+        /* Bottom UI */
+        #ui-layer { 
+            position: fixed; 
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            pointer-events: none; 
+            z-index: 100; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: flex-end; 
+            padding-bottom: max(env(safe-area-inset-bottom, 15px), 15px); 
+        }
+        .hint-text { 
+            position: relative;
+            color: #ffffff; 
+            font-size: 11px; 
+            font-weight: 600; 
+            pointer-events: none; 
+            opacity: 0; 
+            text-shadow: 0 1px 2px rgba(0,0,0,0.8); 
+            transition: opacity 0.5s; 
+            font-family: 'Cairo', sans-serif; 
+            margin-bottom: 8px;
+            letter-spacing: 0.5px;
+            background: rgba(0,0,0,0.5);
+            padding: 5px 14px;
+            border-radius: 12px;
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+            border: 1px solid rgba(255,255,255,0.15);
+        }
+        #close-btn { 
+            padding: 6px 16px; 
+            background: rgba(0, 0, 0, 0.7); 
+            color: #d4af37; 
+            border: 1px solid rgba(212, 175, 55, 0.6); 
+            border-radius: 12px; 
+            font-weight: 600; 
+            font-size: 11px; 
+            cursor: pointer; 
+            display: none; 
+            pointer-events: auto; 
+            box-shadow: 0 4px 10px rgba(0,0,0,0.4); 
+            font-family: 'Cairo', sans-serif; 
+            transition: all 0.3s; 
+            backdrop-filter: blur(8px); 
+            -webkit-backdrop-filter: blur(8px);
+            letter-spacing: 1px;
+        }
+        #close-btn:active { transform: scale(0.95); background: rgba(0, 0, 0, 0.9); border-color: #ffd700; }
+
+        @media (min-width: 768px) { 
+            .loader-title { font-size: 2.2rem; } 
+            .hint-text { font-size: 12px; margin-bottom: 10px; } 
+            #close-btn { font-size: 12px; padding: 7px 20px; } 
+            #ui-layer { padding-bottom: 25px; }
+        }
+    </style>
+</head>
+<body>
+    <div id="loader">
+        <div class="loader-title">GO SMART HOME</div>
+        <div class="loader-logo-container"><img id="loader-img" src="WhatsApp_Image_2026-07-03_at_12.16.00_AM-removebg-preview.png" alt="Logo" crossorigin="anonymous" onerror="this.style.display='none'"></div>
+        <div class="loading-bar-track" id="loading-track"><div id="loading-bar-fill"></div></div>
+        <div class="loader-text" id="loader-status">جاري تجهيز الدعوة...</div>
+    </div>
+
+    <div id="ui-layer">
+        <div class="hint-text" id="interaction-hint">اسحب الشاشة للتدوير</div>
+        <button id="close-btn" onclick="closeCard()">إغلاق X</button>
+    </div>
+    
+    <video id="bird-video" src="7056277182.mp4" playsinline crossorigin="anonymous" muted autoplay loop style="display:none;" preload="auto"></video>
+
+    <script>
+        let scene, camera, renderer, leftGate, rightGate, signBoard, birdPlane, c1, c2, backdropBase, backdropComp;
+        let currentCard = null, isCinematic = true, interactionTriggered = false, isReady = false;
+        let raycaster = new THREE.Raycaster(), mouse = new THREE.Vector2();
+        let isDragging = false, hasMoved = false, prevMouse = {x:0, y:0}, origTransforms = new Map();
+        
+        const loadedAssets = {}, socialMeshes = [];
+        let finalCamZ = 40; 
+        let focusDist = 14; 
+        
+        const links = { 
+            fb: 'https://www.facebook.com/share/1HgHpL4vqN/?mibextid=wwXIfr', 
+            tiktok: 'https://www.tiktok.com/@gosmarthome33?_r=1&_t=ZS-97jqczxIUtt', 
+            ig: 'https://www.instagram.com/american_academy_gosmarthome?igsh=MXhkN2xrODBiOHVrNg==' 
+        };
+        
+        const assetsToLoad = {
+            logo: { src: 'WhatsApp_Image_2026-07-03_at_12.16.00_AM-removebg-preview.png', needsFallback: false },
+            bgBase: { src: 'bd275616-e052-4281-9438-dae1faa564e1', needsFallback: true },
+            bgComp: { src: 'a40cf355-e1aa-4baf-a5e5-8fa1c7b33528', needsFallback: true },
+            cap: { src: 'ad21411e-c8c8-4547-9d58-f27474462707-removebg-preview.png', needsFallback: false },
+            fb: { src: 'Logo_de_Facebook.png', needsFallback: false },
+            tiktok: { src: 'tiktok-icon.png', needsFallback: false },
+            ig: { src: 'instagram-logo-colored.jpg', needsFallback: false }
+        };
+        
+        let assetsLoaded = 0; 
+        const totalImageAssets = Object.keys(assetsToLoad).length;
+        const cameraFov = 60; 
+        const gateZ = 120; 
+        const bgZ = -1000;    
+        const compZ = -60;    
+        
+        // Massive scaled sizes to completely cover any mobile/desktop viewport size
+        const gateW = 200, gateH = 300, gateD = 2;
+        const cardW = 14, cardH = 22, cardD = 0.4;
+        let cardSeparation = 10; 
+
+        function calcSweetSpot() {
+            if(!camera) return;
+            const aspect = window.innerWidth / window.innerHeight;
+            camera.aspect = aspect;
+            camera.updateProjectionMatrix();
+
+            const isMobile = aspect < 1;
+            cardSeparation = isMobile ? (cardW / 2 + 0.8) : 10; 
+            
+            const fovRad = THREE.MathUtils.degToRad(camera.fov);
+            const totalW = (cardSeparation * 2) + cardW + (isMobile ? 1 : 4); 
+            const totalH = cardH + (isMobile ? 2 : 8); 
+            
+            const distW = (totalW / 2) / (Math.tan(fovRad / 2) * aspect);
+            const distH = (totalH / 2) / Math.tan(fovRad / 2);
+            
+            finalCamZ = Math.max(distW, distH);
+            
+            const singlePad = isMobile ? 1.0 : 4.0;
+            const fDistW = ((cardW + singlePad) / 2) / (Math.tan(fovRad / 2) * aspect);
+            const fDistH = ((cardH + singlePad) / 2) / Math.tan(fovRad / 2);
+            focusDist = Math.max(fDistW, fDistH);
+            if(focusDist < 10.0) focusDist = 10.0; 
+
+            if (backdropBase && loadedAssets.bgBase) {
+                const distToBase = finalCamZ - bgZ; 
+                const frustumH_Base = 2 * distToBase * Math.tan(fovRad / 2);
+                const frustumW_Base = frustumH_Base * aspect;
+                backdropBase.scale.set(frustumW_Base * 1.3, frustumH_Base * 1.3, 1);
+            }
+
+            if (backdropComp && loadedAssets.bgComp) {
+                const compImg = loadedAssets.bgComp;
+                const compAspect = (compImg.width || 1) / (compImg.height || 1);
+                const distToComp = finalCamZ - compZ;
+                const frustumH_Comp = 2 * distToComp * Math.tan(fovRad / 2);
+                const frustumW_Comp = frustumH_Comp * aspect;
+
+                let cScaleW, cScaleH;
+                if (frustumW_Comp / frustumH_Comp > compAspect) {
+                    cScaleH = frustumH_Comp * 0.98; 
+                    cScaleW = cScaleH * compAspect;
+                } else {
+                    cScaleW = frustumW_Comp * 0.98; 
+                    cScaleH = cScaleW / compAspect;
+                }
+                backdropComp.scale.set(cScaleW, cScaleH, 1);
+            }
+            
+            if(c1) c1.position.set(cardSeparation, 0, 0);
+            if(c2) c2.position.set(-cardSeparation, 0, 0);
+        }
+
+        function setAppReady() {
+            if(isReady) return;
+            isReady = true;
+            init3D();
+            
+            document.fonts.ready.then(() => {
+                const track = document.getElementById('loading-track');
+                if(track) track.style.display = 'none';
+                const status = document.getElementById('loader-status');
+                if(status) status.innerHTML = "<div class='loader-tap-hint'>انقر هنا لبدء العرض</div>";
+            });
+        }
+
+        function updateProg() {
+            if(isReady) return;
+            assetsLoaded++; 
+            const fill = document.getElementById('loading-bar-fill');
+            if(fill) fill.style.width = `${(assetsLoaded/totalImageAssets)*100}%`;
+            if (assetsLoaded >= totalImageAssets) {
+                setAppReady();
+            }
+        }
+
+        function loadImgWithFallback(id, config) {
+            const extensions = config.needsFallback ? ['.jfif', '.jpeg', '.jpg', '.png'] : [''];
+            let currentExtIndex = 0;
+
+            function attemptLoad() {
+                const img = new Image(); 
+                img.crossOrigin = "anonymous"; 
+                
+                const srcToTry = config.needsFallback ? config.src + extensions[currentExtIndex] : config.src;
+                
+                img.onload = () => { 
+                    loadedAssets[id] = img; 
+                    updateProg(); 
+                }; 
+                
+                img.onerror = () => { 
+                    currentExtIndex++;
+                    if (currentExtIndex < extensions.length) {
+                        attemptLoad(); 
+                    } else {
+                        const dummy = document.createElement('canvas');
+                        dummy.width = 512; dummy.height = 512;
+                        const dctx = dummy.getContext('2d');
+                        dctx.fillStyle = '#ffffff'; dctx.fillRect(0,0,512,512);
+                        loadedAssets[id] = dummy; 
+                        updateProg(); 
+                    }
+                }; 
+                
+                img.src = srcToTry; 
+            }
+            
+            attemptLoad();
+        }
+        
+        const triggerStart = (e) => {
+            if (!interactionTriggered && isReady) {
+                interactionTriggered = true;
+                const v = document.getElementById('bird-video');
+                if (v) {
+                    v.muted = true; 
+                    const playPromise = v.play();
+                    if (playPromise !== undefined) {
+                        playPromise.catch(error => { console.log("Video autoplay prevented", error); });
+                    }
+                }
+
+                gsap.to('#loader', {opacity: 0, duration: 0.3, ease: "power2.inOut", onComplete: () => {
+                    document.getElementById('loader').style.display = 'none';
+                    startCinematic();
+                }});
+            }
+        };
+
+        window.onload = () => {
+            for(let key in assetsToLoad) {
+                loadImgWithFallback(key, assetsToLoad[key]);
+            }
+            
+            // STRICT 5-SECOND HARD TIMEOUT REQUIREMENT
+            setTimeout(() => {
+                const loader = document.getElementById('loader');
+                if (loader && loader.style.display !== 'none') {
+                    // MUST execute this line precisely to guarantee removal
+                    loader.style.display = 'none';
+                    
+                    if (!isReady) setAppReady();
+                    
+                    if (!interactionTriggered) {
+                        interactionTriggered = true;
+                        
+                        const v = document.getElementById('bird-video');
+                        if (v) {
+                            v.muted = true;
+                            const playPromise = v.play();
+                            if (playPromise !== undefined) playPromise.catch(e => console.log(e));
+                        }
+                        
+                        startCinematic();
+                    }
+                }
+            }, 5000); 
+        };
+        
+        window.addEventListener('pointerdown', triggerStart);
+        window.addEventListener('touchstart', triggerStart, {passive: false});
+
+        function drawGoldenRose(ctx, x, y, size) {
+            ctx.save(); ctx.translate(x, y);
+            ctx.rotate(Math.random() * Math.PI * 2);
+
+            for (let i = 12; i > 0; i--) {
+                const r = (size / 2) * (i / 12);
+                ctx.beginPath();
+                for (let a = 0; a < Math.PI * 2; a += 0.3) {
+                    const w = r + Math.sin(a * 5 + i) * (size * 0.18);
+                    ctx.arc(Math.cos(a) * w, Math.sin(a) * w, r * 0.45, 0, Math.PI * 2);
+                }
+                const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, r);
+                grad.addColorStop(0, '#ffffff'); 
+                grad.addColorStop(0.25, '#fff1a0'); 
+                grad.addColorStop(0.7, '#ffd700'); 
+                grad.addColorStop(1, '#c49a20'); 
+                ctx.fillStyle = grad; 
+                ctx.fill(); 
+                ctx.lineWidth = 1.5; 
+                ctx.strokeStyle = 'rgba(255, 245, 180, 0.9)'; 
+                ctx.stroke();
+            }
+            ctx.restore();
+        }
+
+        function drawTextLines(ctx, text, x, y, maxW, lineH) {
+            if(!text) return; 
+            ctx.direction = 'rtl'; 
+            ctx.textAlign = 'center';
+            const sections = text.split('~');
+            let curY = y;
+            sections.forEach(sec => {
+                const words = sec.trim().split(' ');
+                let line = '';
+                for(let n=0; n<words.length; n++) {
+                    let test = line + words[n] + ' ';
+                    if (ctx.measureText(test).width > maxW && n > 0) {
+                        ctx.fillText(line.trim(), x, curY);
+                        line = words[n] + ' ';
+                        curY += lineH;
+                    } else { line = test; }
+                }
+                ctx.fillText(line.trim(), x, curY);
+                curY += lineH * 1.35; 
+            });
+        }
+
+        // STRICT 2048px CANVAS RESOLUTION REQUIREMENT
+        function createCardCanvas(isFront, txtData) {
+            const cw = 2048, ch = 3072; // Adjusted proportionally for exact 2048 width limit
+            const c = document.createElement('canvas'); c.width = cw; c.height = ch; const ctx = c.getContext('2d');
+            ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,cw,ch);
+            
+            if(!isFront) {
+                ctx.strokeStyle = 'rgba(212, 175, 55, 0.15)'; ctx.lineWidth = 6; ctx.beginPath();
+                for(let i = -ch; i < cw*2; i += 75) { ctx.moveTo(i, 0); ctx.lineTo(i+ch, ch); ctx.moveTo(i, ch); ctx.lineTo(i+ch, 0); } ctx.stroke();
+            }
+            
+            // Arabesque Border Scaled
+            ctx.strokeStyle = '#d4af37'; ctx.lineWidth = 14; ctx.lineJoin = 'round';
+            const m1 = 90, m2 = 120;
+            ctx.strokeRect(m1, m1, cw - m1*2, ch - m1*2); 
+            ctx.lineWidth = 6; ctx.strokeStyle = '#c49a20';
+            ctx.strokeRect(m2, m2, cw - m2*2, ch - m2*2);
+            
+            const dr = (x, y) => {
+                ctx.save(); ctx.translate(x, y); ctx.beginPath(); ctx.moveTo(0, -67.5);
+                ctx.quadraticCurveTo(45, -45, 67.5, 0); ctx.quadraticCurveTo(45, 45, 0, 67.5); 
+                ctx.quadraticCurveTo(-45, 45, -67.5, 0); ctx.quadraticCurveTo(-45, -45, 0, -67.5);
+                ctx.fillStyle = '#e5c158'; ctx.fill(); ctx.stroke(); ctx.restore();
+            };
+            dr(m1, m1); dr(cw-m1, m1); dr(cw-m1, ch-m1); dr(m1, ch-m1);
+            dr(cw/2, m1); dr(cw/2, ch-m1); dr(m1, ch/2); dr(cw-m1, ch/2);
+
+            if(isFront) {
+                const rs = 112, pd = 45;
+                for(let x=pd; x<=cw-pd; x+=rs*0.25) {
+                    drawGoldenRose(ctx, x, pd, rs*(0.9+Math.random()*0.4)); 
+                    drawGoldenRose(ctx, x, ch-pd, rs*(1+Math.random()*0.4));
+                } 
+                for(let y=pd+rs; y<=ch-pd-rs; y+=rs*0.25) { 
+                    drawGoldenRose(ctx, pd, y, rs*(0.8+Math.random()*0.5)); 
+                    drawGoldenRose(ctx, cw-pd, y, rs*(0.8+Math.random()*0.5)); 
+                }
+            }
+
+            ctx.textAlign='center'; ctx.textBaseline='top'; 
+            ctx.fillStyle='#d4af37'; ctx.font='bold 180px Amiri, serif';
+            ctx.shadowColor='rgba(0,0,0,0.2)'; ctx.shadowBlur=9; ctx.shadowOffsetY=6; 
+            
+            // BRANDING REQUIREMENT: strictly "GO SMART HOME"
+            ctx.fillText('GO SMART HOME', cw/2, 262); 
+            ctx.shadowColor='transparent';
+
+            if(loadedAssets.logo && loadedAssets.logo.width) {
+                const lx = cw/2, ly = 787, lr = 262;
+                ctx.save(); ctx.beginPath(); ctx.arc(lx, ly, lr, 0, Math.PI*2); ctx.clip();
+                ctx.drawImage(loadedAssets.logo, lx - lr, ly - lr, lr*2, lr*2); ctx.restore();
+                ctx.beginPath(); ctx.arc(lx, ly, lr, 0, Math.PI*2); ctx.strokeStyle='#d4af37'; ctx.lineWidth=22; ctx.stroke();
+            }
+
+            if(isFront && txtData) {
+                ctx.fillStyle = '#9e7d23'; 
+                ctx.font = 'bold 101px Cairo'; 
+                drawTextLines(ctx, txtData, cw/2, 1125, 1725, 142);
+            } else if(!isFront) {
+                ctx.fillStyle='#aa8a2e'; ctx.font='bold 180px Cairo'; ctx.fillText('تواصل معنا', cw/2, 1425); 
+                ctx.fillStyle='#999'; ctx.font='bold 127px Amiri'; ctx.fillText('Connect With Us', cw/2, 1687); 
+            }
+
+            const tex = new THREE.CanvasTexture(c); 
+            tex.encoding = THREE.sRGBEncoding; 
+            if(renderer) { tex.anisotropy = renderer.capabilities.getMaxAnisotropy(); }
+            tex.minFilter = THREE.LinearFilter;
+            tex.magFilter = THREE.LinearFilter;
+            tex.generateMipmaps = false; 
+            tex.needsUpdate = true;
+            return tex;
+        }
+
+        function createWood() {
+            const c = document.createElement('canvas'); c.width=1024; c.height=1024; const ctx=c.getContext('2d');
+            ctx.fillStyle='#36200f'; ctx.fillRect(0,0,1024,1024); ctx.strokeStyle='#1b0f05'; ctx.lineWidth=4;
+            for(let i=0; i<1500; i++) { 
+                ctx.beginPath(); const x=Math.random()*1024; 
+                ctx.moveTo(x,0); ctx.lineTo(x+(Math.random()*50-25),1024); 
+                ctx.globalAlpha=Math.random()*0.4; ctx.stroke(); 
+            }
+            const t = new THREE.CanvasTexture(c); t.encoding=THREE.sRGBEncoding; return t;
+        }
+
+        function createPedestalTexture() {
+            const c = document.createElement('canvas'); c.width=1024; c.height=512; const ctx=c.getContext('2d');
+            ctx.fillStyle='#805c00'; ctx.fillRect(0,0,1024,512); 
+            for(let i=0; i<450; i++) drawGoldenRose(ctx, Math.random()*1024, Math.random()*512, 60+Math.random()*70);
+            const t = new THREE.CanvasTexture(c); t.encoding=THREE.sRGBEncoding; t.wrapS=t.wrapT=THREE.RepeatWrapping; return t;
+        }
+
+        function imgToCanvas(img){ 
+            if(!img || !img.width) {
+                const c=document.createElement('canvas'); c.width=512; c.height=512; 
+                const ctx=c.getContext('2d'); ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,512,512); return c;
+            }
+            const c=document.createElement('canvas'); c.width=img.width; c.height=img.height; 
+            c.getContext('2d').drawImage(img,0,0); return c; 
+        }
+
+        function init3D() {
+            if (scene) return; 
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(cameraFov, window.innerWidth/window.innerHeight, 0.1, 10000);
+            
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: "high-performance" });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.outputEncoding = THREE.sRGBEncoding;
+            document.body.insertBefore(renderer.domElement, document.getElementById('ui-layer'));
+
+            // High-quality AmbientLight
+            scene.add(new THREE.AmbientLight(0xffffff, 3.0));
+            const dl = new THREE.DirectionalLight(0xffffff, 1.5); 
+            dl.position.set(0, 10, 20); 
+            scene.add(dl);
+
+            const baseTex = new THREE.CanvasTexture(imgToCanvas(loadedAssets.bgBase));
+            baseTex.encoding = THREE.sRGBEncoding;
+            const baseMat = new THREE.MeshBasicMaterial({ map: baseTex, depthWrite: false, side: THREE.FrontSide });
+            backdropBase = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), baseMat);
+            backdropBase.position.set(0, 0, bgZ); 
+            scene.add(backdropBase);
+
+            const compTex = new THREE.CanvasTexture(imgToCanvas(loadedAssets.bgComp));
+            compTex.encoding = THREE.sRGBEncoding;
+            const compMat = new THREE.MeshBasicMaterial({ 
+                map: compTex, 
+                transparent: true, 
+                alphaTest: 0.05, 
+                depthWrite: false, 
+                side: THREE.FrontSide,
+                blending: THREE.NormalBlending
+            });
+            backdropComp = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), compMat);
+            backdropComp.position.set(0, 0, compZ); 
+            scene.add(backdropComp);
+
+            calcSweetSpot(); 
+            camera.position.set(0, 15, gateZ + 75); 
+
+            buildGates(); 
+            buildCards();
+            
+            const v = document.getElementById('bird-video'); 
+            const vt = new THREE.VideoTexture(v); 
+            vt.encoding = THREE.sRGBEncoding;
+            vt.minFilter = THREE.LinearFilter;
+            vt.magFilter = THREE.LinearFilter;
+            
+            birdPlane = new THREE.Mesh(
+                new THREE.PlaneGeometry(180, 90), 
+                new THREE.MeshBasicMaterial({map:vt, transparent:true, blending:THREE.AdditiveBlending, depthWrite:false, opacity:0})
+            );
+            birdPlane.position.set(0, -25, gateZ - 10); 
+            scene.add(birdPlane);
+
+            renderer.compile(scene, camera);
+
+            window.addEventListener('resize', ()=> { 
+                calcSweetSpot();
+                renderer.setSize(window.innerWidth, window.innerHeight); 
+                if(!isCinematic && !currentCard) {
+                    gsap.to(camera.position, {x: 0, y: 0, z: finalCamZ, duration: 0.5, overwrite: "auto"});
+                } else if(currentCard) {
+                    gsap.to(camera.position, {x: currentCard.position.x, y: 0, z: focusDist, duration: 0.5, overwrite: "auto"});
+                }
+            });
+            
+            renderer.domElement.addEventListener('pointerdown', e=>{ 
+                if(isCinematic) return; isDragging=true; hasMoved=false; prevMouse=getP(e); 
+            });
+            window.addEventListener('pointermove', e=>{
+                if(!isDragging || isCinematic) return; 
+                const p=getP(e); const dx=p.x-prevMouse.x, dy=p.y-prevMouse.y; 
+                if(Math.abs(dx)>3||Math.abs(dy)>3) hasMoved=true;
+                if(currentCard && hasMoved){ currentCard.rotation.y += dx*0.015; currentCard.rotation.x += dy*0.015; } 
+                prevMouse=p;
+            });
+            window.addEventListener('pointerup', e=>{ 
+                isDragging=false; if(!hasMoved && !isCinematic) handleClick(e); 
+            });
+
+            requestAnimationFrame(function anim(){ 
+                requestAnimationFrame(anim); 
+                const vid = document.getElementById('bird-video');
+                if(birdPlane && birdPlane.material.opacity > 0 && vid.readyState >= vid.HAVE_CURRENT_DATA) {
+                    birdPlane.material.map.needsUpdate = true; 
+                }
+                renderer.render(scene,camera); 
+            });
+        }
+
+        function buildGates() {
+            const wMat = new THREE.MeshStandardMaterial({map:createWood(), roughness:0.95});
+            
+            // GATE SCALING CONSTRAINT: Massively oversized to cover 100vw/100vh with zero gaps
+            leftGate = new THREE.Group(); 
+            leftGate.position.set(-gateW, 15, gateZ); 
+            const lMesh = new THREE.Mesh(new THREE.BoxGeometry(gateW, gateH, gateD), wMat); 
+            lMesh.position.set(gateW/2, 0, 0); 
+            leftGate.add(lMesh);
+            
+            rightGate = new THREE.Group(); 
+            rightGate.position.set(gateW, 15, gateZ); 
+            const rMesh = new THREE.Mesh(new THREE.BoxGeometry(gateW, gateH, gateD), wMat); 
+            rMesh.position.set(-gateW/2, 0, 0); 
+            rightGate.add(rMesh);
+
+            const logoSize = 38;
+            const halfSize = logoSize / 2;
+            
+            const texL = new THREE.Texture(loadedAssets.logo || imgToCanvas(null)); texL.needsUpdate = true;
+            texL.repeat.set(0.5, 1); texL.offset.set(0, 0); texL.encoding = THREE.sRGBEncoding;
+            texL.minFilter = THREE.LinearFilter; texL.magFilter = THREE.LinearFilter;
+            
+            const texR = new THREE.Texture(loadedAssets.logo || imgToCanvas(null)); texR.needsUpdate = true;
+            texR.repeat.set(0.5, 1); texR.offset.set(0.5, 0); texR.encoding = THREE.sRGBEncoding;
+            texR.minFilter = THREE.LinearFilter; texR.magFilter = THREE.LinearFilter;
+
+            const logoMatL = new THREE.MeshBasicMaterial({map: texL, transparent: true, opacity: 1, alphaTest: 0.5, depthWrite: true, side: THREE.FrontSide});
+            const logoPlaneL = new THREE.Mesh(new THREE.PlaneGeometry(halfSize, logoSize), logoMatL);
+            // DOOR LOGO CONSTRAINT: Exactly 0.05 units forward Z-index offset
+            logoPlaneL.position.set(gateW - halfSize/2, 0, gateD/2 + 0.05); 
+            leftGate.add(logoPlaneL);
+
+            const logoMatR = new THREE.MeshBasicMaterial({map: texR, transparent: true, opacity: 1, alphaTest: 0.5, depthWrite: true, side: THREE.FrontSide});
+            const logoPlaneR = new THREE.Mesh(new THREE.PlaneGeometry(halfSize, logoSize), logoMatR);
+            // DOOR LOGO CONSTRAINT: Exactly 0.05 units forward Z-index offset
+            logoPlaneR.position.set(-gateW + halfSize/2, 0, gateD/2 + 0.05); 
+            rightGate.add(logoPlaneR);
+
+            const sc = document.createElement('canvas'); sc.width=2048; sc.height=512; const sx=sc.getContext('2d');
+            sx.fillStyle='#ffffff'; sx.fillRect(0,0,2048,512);
+            sx.strokeStyle='#d4af37'; sx.lineWidth=20; sx.strokeRect(20,20,2008,472);
+            sx.fillStyle='#d4af37'; sx.font='bold 240px Amiri'; sx.textAlign='center'; sx.textBaseline='middle';
+            sx.fillText('GO SMART HOME', 1024, 256);
+            const sTex = new THREE.CanvasTexture(sc); 
+            sTex.encoding=THREE.sRGBEncoding; sTex.minFilter = THREE.LinearFilter; sTex.magFilter = THREE.LinearFilter;
+
+            signBoard = new THREE.Mesh(new THREE.BoxGeometry(50, 12, 2.5), new THREE.MeshStandardMaterial({map:sTex, roughness:0.2}));
+            signBoard.position.set(0, (gateH/2) + 15 + 8, gateZ);
+
+            scene.add(leftGate); scene.add(rightGate); scene.add(signBoard);
+        }
+
+        function buildCards() {
+            const g = new THREE.BoxGeometry(cardW, cardH, cardD);
+            const edgeMat = new THREE.MeshStandardMaterial({color:0xffd700, metalness:0.95, roughness:0.1});
+            const backMat = new THREE.MeshStandardMaterial({map:createCardCanvas(false, null), roughness:0.15});
+
+            const txt1 = "بكل المحبة والتقدير، نتشرف بدعوتكم لحضور حفل التكريم، ~ آملين أن يكتمل جمال المناسبة بحضوركم الكريم ~ تتشرف د/ داليا بدعوتكم لحضور حفل التكريم لسيادة النائب / احمد خشانه";
+            const t1 = createCardCanvas(true, txt1);
+            c1 = new THREE.Mesh(g, [edgeMat, edgeMat, edgeMat, edgeMat, new THREE.MeshStandardMaterial({map:t1, roughness:0.15}), backMat]);
+            c1.position.set(cardSeparation, 0, 0); 
+            c1.rotation.y = 0; 
+
+            const txt2 = "حضوركم شرف لنا، ~ ووجودكم يضيف على المناسبة بهجةً وتميزًا ~ يوم الجمعة 10/7/2026 ~ الاستقبال من 6:00 PM إلى 11:00 PM ~ السويس، الكورنيش القديم - داخل منتجع WATER WAY SUEZ ~ يشرفنا حضوركم الكريم";
+            const t2 = createCardCanvas(true, txt2);
+            c2 = new THREE.Mesh(g, [edgeMat, edgeMat, edgeMat, edgeMat, new THREE.MeshStandardMaterial({map:t2, roughness:0.15}), backMat]);
+            c2.position.set(-cardSeparation, 0, 0); 
+            c2.rotation.y = 0;
+
+            scene.add(c1); scene.add(c2);
+
+            const capTex = new THREE.CanvasTexture(imgToCanvas(loadedAssets.cap));
+            capTex.encoding = THREE.sRGBEncoding; capTex.minFilter = THREE.LinearFilter; capTex.magFilter = THREE.LinearFilter;
+            const capMat = new THREE.MeshBasicMaterial({
+                map: capTex, transparent: true, alphaTest: 0.1, side: THREE.DoubleSide
+            });
+            const capGeometry = new THREE.PlaneGeometry(8, 8);
+
+            // Calculate precise corner coordinates for placing cap meshes
+            const cornerX = -cardW / 2;
+            const cornerY = cardH / 2;
+            const cornerZ = cardD / 2;
+
+            [c1, c2].forEach((c, idx) => {
+                const pd = new THREE.Mesh(new THREE.BoxGeometry(cardW + 1.5, 2, 4), new THREE.MeshBasicMaterial({map:createPedestalTexture()}));
+                pd.position.set(0, -cardH/2 - 1, 0); 
+                c.add(pd);
+
+                const capMesh = new THREE.Mesh(capGeometry, capMat);
+                // GRADUATION CAP SPACING CONSTRAINT: Exact minimal gap coords relative to corner
+                capMesh.position.set(cornerX - 0.2, cornerY + 0.15, cornerZ + 0.01);
+                capMesh.rotation.z = Math.PI / 8; 
+                capMesh.rotation.x = -Math.PI / 15;
+                c.add(capMesh);
+
+                const socSize = 3;
+                ['ig','tiktok','fb'].forEach((k, i) => {
+                    const st = new THREE.CanvasTexture(imgToCanvas(loadedAssets[k]));
+                    st.minFilter = THREE.LinearFilter; st.magFilter = THREE.LinearFilter;
+                    const ic = new THREE.Mesh(
+                        new THREE.PlaneGeometry(socSize, socSize), 
+                        new THREE.MeshBasicMaterial({map:st, transparent:true})
+                    );
+                    ic.position.set((i-1)*(socSize*1.4), -cardH/4 - 1.5, -0.21); 
+                    ic.rotation.y = Math.PI; 
+                    ic.userData = { url: links[k] }; 
+                    c.add(ic); socialMeshes.push(ic);
+                });
+                origTransforms.set(c, {p: c.position.clone(), r: c.rotation.clone()});
+            });
+        }
+
+        function startCinematic() {
+            isCinematic = true; 
+            const tl = gsap.timeline();
+
+            // GATE ANIMATION CONSTRAINT: Gates open INWARD with power2.inOut
+            tl.to(leftGate.rotation, {y: Math.PI/2, duration: 3, ease: "power2.inOut"}, 0);
+            tl.to(rightGate.rotation, {y: -Math.PI/2, duration: 3, ease: "power2.inOut"}, 0);
+            
+            tl.to(signBoard.position, {y: signBoard.position.y + 25, duration: 3, ease: "power2.inOut"}, 0);
+            tl.to(signBoard.material, {opacity: 0, transparent: true, duration: 2.5}, 0.5);
+
+            tl.add(() => { gsap.to(birdPlane.material, {opacity: 1, duration: 0.6}); }, 2.8);
+            tl.to(birdPlane.position, {y: 45, z: finalCamZ - 10, duration: 6.5, ease: "none"}, 2.8);
+            
+            tl.to(camera.position, {x: 0, z: finalCamZ, y: 0, duration: 6, ease: "power1.inOut"}, 3.0);
+            tl.to(birdPlane.material, {opacity: 0, duration: 1.5}, 7.5); 
+
+            tl.add(() => { isCinematic = false; }, 9.0);
+        }
+
+        function getP(e){ return e.touches && e.touches.length > 0 ? {x: e.touches[0].clientX, y: e.touches[0].clientY} : {x: e.clientX, y: e.clientY}; }
+        
+        function handleClick(e) {
+            const p = getP(e); 
+            mouse.x = (p.x / window.innerWidth) * 2 - 1; 
+            mouse.y = -(p.y / window.innerHeight) * 2 + 1; 
+            raycaster.setFromCamera(mouse, camera);
+            
+            const sInt = raycaster.intersectObjects(socialMeshes); 
+            if(sInt.length > 0){ window.open(sInt[0].object.userData.url, '_blank'); return; }
+            
+            if(!currentCard) { 
+                const cInt = raycaster.intersectObjects([c1, c2]); 
+                if(cInt.length > 0) focus(cInt[0].object); 
+            }
+        }
+
+        function focus(c) {
+            currentCard = c; 
+            document.getElementById('close-btn').style.display='block'; 
+            document.getElementById('interaction-hint').style.opacity='1';
+            
+            gsap.to(camera.position, {x: c.position.x, y: 0, z: focusDist, duration: 1.2, ease: "power3.out", overwrite: "auto"}); 
+            gsap.to(c.rotation, {x: 0, y: 0, z: 0, duration: 1.2, overwrite: "auto"});
+        }
+
+        window.closeCard = () => {
+            if(!currentCard) return; 
+            const o = origTransforms.get(currentCard);
+            document.getElementById('close-btn').style.display='none'; 
+            document.getElementById('interaction-hint').style.opacity='0';
+            
+            gsap.to(camera.position, {x: 0, y: 0, z: finalCamZ, duration: 1.2, ease: "power3.inOut", overwrite: "auto"}); 
+            gsap.to(currentCard.rotation, {x: o.r.x, y: o.r.y, z: o.r.z, duration: 1.2, overwrite: "auto"});
+            currentCard = null;
+        };
+    </script>
+</body>
+</html> 
