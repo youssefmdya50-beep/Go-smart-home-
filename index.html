@@ -227,7 +227,8 @@
             ig: { src: 'instagram-logo-colored.jpg', needsFallback: false },
             wood: { src: './365497b9-6d12-4ae4-9ad8-23e68d74b128.jfif', needsFallback: false },
             flowers: { src: './1-19-removebg-preview.png', needsFallback: false },
-            rose: { src: 'a1da2e0d6c4e3393dcb832a692872bb3-removebg-preview.png', needsFallback: false }
+            rose: { src: 'a1da2e0d6c4e3393dcb832a692872bb3-removebg-preview.png', needsFallback: false },
+            locationIcon: { src: 'location-162102__340-removebg-preview.png', needsFallback: false }
         };
         
         let assetsLoaded = 0; 
@@ -429,7 +430,7 @@
                     }
                 }
             }
-            else if (['fb', 'tiktok', 'ig'].includes(id) && socialTextures[id]) {
+            else if (['fb', 'tiktok', 'ig', 'locationIcon'].includes(id) && socialTextures[id]) {
                 socialTextures[id].image = imgToCanvas(loadedAssets[id]);
                 optimizeTexture(socialTextures[id]);
             }
@@ -615,6 +616,23 @@
             renderer.outputEncoding = THREE.sRGBEncoding;
             document.body.insertBefore(renderer.domElement, document.getElementById('ui-layer'));
 
+            // --- OPTIMIZATION PATCH: Context Loss Handling ---
+            renderer.domElement.addEventListener('webglcontextlost', (event) => {
+                event.preventDefault();
+                console.warn("WebGL context lost. Pausing operations to prevent crash.");
+                const v = document.getElementById('bird-video');
+                if (v && !v.paused) v.pause();
+            }, false);
+
+            renderer.domElement.addEventListener('webglcontextrestored', () => {
+                console.log("WebGL context restored.");
+                const v = document.getElementById('bird-video');
+                if (v && interactionTriggered) v.play();
+                // Force shaders to recompile gracefully
+                renderer.compile(scene, camera);
+            }, false);
+            // --------------------------------------------------
+
             scene.add(new THREE.AmbientLight(0xffffff, 2.2));
 
             const goldenLight = new THREE.DirectionalLight(0xfff5e6, 1.8); 
@@ -654,10 +672,40 @@
             buildGates(); 
             buildCards();
             
+            // --- OPTIMIZATION PATCH: Video Texture Initialization ---
             const v = document.getElementById('bird-video'); 
+            
+            // Enforce browser-specific attributes to prevent blocking/artifacts
+            v.muted = true;
+            v.setAttribute('playsinline', '');
+            v.setAttribute('webkit-playsinline', '');
+
             const vt = new THREE.VideoTexture(v); 
             vt.encoding = THREE.sRGBEncoding;
+            
+            // Stop Three.js from auto-updating the video texture blindly on every frame
+            vt.generateMipmaps = false;
+            
             optimizeTexture(vt);
+            
+            // Track actual decoded video frames to prevent VRAM flooding
+            window.videoFrameReady = false;
+            if ('requestVideoFrameCallback' in v) {
+                const onVideoFrame = () => {
+                    window.videoFrameReady = true;
+                    v.requestVideoFrameCallback(onVideoFrame);
+                };
+                v.requestVideoFrameCallback(onVideoFrame);
+            } else {
+                // Fallback for older iOS/Browsers
+                let lastVideoTime = -1;
+                v.addEventListener('timeupdate', () => {
+                    if (v.currentTime !== lastVideoTime) {
+                        window.videoFrameReady = true;
+                        lastVideoTime = v.currentTime;
+                    }
+                });
+            }
             
             birdPlane = new THREE.Mesh(
                 new THREE.PlaneGeometry(180, 90), 
@@ -665,6 +713,7 @@
             );
             birdPlane.position.set(0, -25, gateZ - 10); 
             scene.add(birdPlane);
+            // ---------------------------------------------------------
 
             renderer.compile(scene, camera);
 
@@ -693,14 +742,23 @@
                 isDragging=false; if(!hasMoved && !isCinematic) handleClick(e); 
             });
 
-            requestAnimationFrame(function anim(){ 
+            // --- OPTIMIZATION PATCH: Render Loop ---
+            requestAnimationFrame(function anim() { 
                 requestAnimationFrame(anim); 
+                
                 const vid = document.getElementById('bird-video');
-                if(birdPlane && birdPlane.material.opacity > 0 && vid.readyState >= vid.HAVE_CURRENT_DATA) {
-                    birdPlane.material.map.needsUpdate = true; 
+                
+                // ONLY push to VRAM if the video is visible, playing, and a NEW frame has been decoded
+                if (birdPlane && birdPlane.material.opacity > 0.01) {
+                    if (window.videoFrameReady && !vid.paused && vid.readyState >= vid.HAVE_CURRENT_DATA) {
+                        birdPlane.material.map.needsUpdate = true; 
+                        window.videoFrameReady = false; // Reset until the next frame is decoded
+                    }
                 }
-                renderer.render(scene,camera); 
+                
+                renderer.render(scene, camera); 
             });
+            // ----------------------------------------
         }
 
         function buildGates() {
@@ -863,6 +921,21 @@
                     ic.userData = { url: links[k] }; 
                     c.add(ic); socialMeshes.push(ic);
                 });
+
+                if (c === c2) {
+                    socialTextures['locationIcon'] = new THREE.Texture(loadedAssets['locationIcon']);
+                    optimizeTexture(socialTextures['locationIcon']);
+                    const locSize = 2.2; 
+                    const locMesh = new THREE.Mesh(
+                        new THREE.PlaneGeometry(locSize, locSize), 
+                        new THREE.MeshBasicMaterial({map:socialTextures['locationIcon'], transparent:true})
+                    );
+                    locMesh.position.set(0, -8.5, cardD / 2 + 0.02); 
+                    locMesh.userData = { url: 'https://maps.apple/p/oeZE.aCWUQo3mh' }; 
+                    c.add(locMesh); 
+                    socialMeshes.push(locMesh);
+                }
+
                 origTransforms.set(c, {p: c.position.clone(), r: c.rotation.clone()});
             });
         }
