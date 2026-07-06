@@ -193,6 +193,9 @@
     <video id="bird-video" src="7056277182.mp4" playsinline crossorigin="anonymous" muted autoplay loop style="display:none;" preload="auto"></video>
 
     <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const guestName = urlParams.get('name') || "ضيفنا العزيز";
+
         // Bridge function to prevent "imgToCanvas is not defined" reference errors
         function imgToCanvas(source) { return source; }
 
@@ -204,7 +207,7 @@
         let capMat, leftGateLogoTex, rightGateLogoTex, card1FrontTex, card2FrontTex, cardBackTex, pedestalMat, flowerMat;
         const socialTextures = {};
         
-        const txt1 = "بكل المحبة والتقدير، نتشرف بدعوتكم لحضور حفل التكريم، ~ آملين أن يكتمل جمال المناسبة بحضوركم الكريم ~ تتشرف د/ داليا بدعوتكم لحضور حفل التكريم لسيادة النائب / احمد خشانه";
+        const txt1 = `بكل المحبة والتقدير، نتشرف بدعوتكم لحضور حفل التكريم،\nآملين أن يكتمل جمال المناسبة بحضوركم الكريم\n~\nتتشرف د/داليا\nبدعوتكم لحضور حفل التكريم\n/ ${guestName}`;
         const txt2 = "حضوركم شرف لنا، ~ ووجودكم يضيف على المناسبة بهجةً وتميزًا ~ يوم الجمعة 10/7/2026 ~ الاستقبال من 6:00 PM إلى 11:00 PM ~ السويس، الكورنيش القديم - داخل منتجع WATER WAY SUEZ ~ يشرفنا حضوركم الكريم";
 
         const loadedAssets = {}, socialMeshes = [];
@@ -532,7 +535,8 @@
             if(!text) return; 
             ctx.direction = 'rtl'; 
             ctx.textAlign = 'center';
-            const sections = text.split('~');
+            // Adjusted regex to match EXACTLY " ~ " or "\n", so \n~\n properly separates into its own rendered line.
+            const sections = text.split(/ ~ |\n/);
             let curY = y;
             sections.forEach(sec => {
                 const words = sec.trim().split(' ');
@@ -899,9 +903,15 @@
                 c.add(pd);
 
                 const capMesh = new THREE.Mesh(capGeometry, capMat);
-                capMesh.position.set(cornerX - 0.2, cornerY + 0.15, cornerZ + 0.01);
+                
                 capMesh.rotation.z = Math.PI / 8; 
                 capMesh.rotation.x = -Math.PI / 15;
+                
+                // Precise coordinate adjustment for flush alignment on the frame edge.
+                // Replaced previous complex Box3 bounding logic with a fine-tuned static Y-position offset
+                // derived by slowly increasing from the original clipping value (cornerY + 0.15).
+                capMesh.position.set(cornerX - 0.2, cornerY + 1.1, cornerZ + 0.01);
+                
                 c.add(capMesh);
 
                 const flowerMesh = new THREE.Mesh(flowerGeometry, flowerMat);
